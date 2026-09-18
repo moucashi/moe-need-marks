@@ -174,7 +174,7 @@ public class CalculationTests
     {
         var r = Calculate(new() { Quests = new() { Quest("q", Goal(required: 5)) } });
         var hidden = TooltipFormatter.Lines(r, 1, 0, new() { Future = false });
-        Assert.Equal(3, hidden.Count); Assert.Contains("任务需要 (1/5)", hidden);
+        Assert.Equal(3, hidden.Count(line => line.Length > 0)); Assert.Contains("任务需要 (1/5)", hidden);
         Assert.True(r.QuestFirRemaining);
     }
     [Fact] public void InventoryDedupeUsesIdsAndCountsStacks()
@@ -193,6 +193,6 @@ public class CalculationTests
     [Fact] public void LongDetailsAreNotTruncated()
     {
         var s = new Snapshot { Quests = Enumerable.Range(0, 300).Select(i => Quest("q" + i, Goal())).ToList() };
-        Assert.Equal(303, Lines(Calculate(s)).Count);
+        Assert.Equal(303, Lines(Calculate(s)).Count(line => line.Length > 0));
     }
 }

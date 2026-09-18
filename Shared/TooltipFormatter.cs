@@ -13,15 +13,24 @@ public static class TooltipFormatter
             if (options.QuestSummary) lines.Add($"任务需要 ({result.QuestSubmitted + owned}/{result.QuestRequired})");
             if (options.QuestDetails) AddDetails(result.Quests, false);
         }
+        int areaStart = lines.Count;
         if (result.AreaRequired > 0)
         {
             if (options.AreaSummary) lines.Add($"藏身处需要 ({result.AreaSubmitted + owned}/{result.AreaRequired})");
             if (options.AreaDetails) AddDetails(result.Areas, true);
         }
+        SeparateBlock(areaStart);
+        int totalsStart = lines.Count;
         if (options.Inventory) lines.Add($"当前已有 ({carried}+{stash}) {owned}");
         if (options.Total && result.QuestRequired + result.AreaRequired > 0)
             lines.Add($"总共需要 ({result.QuestSubmitted + result.AreaSubmitted + owned}/{result.QuestRequired + result.AreaRequired})");
+        SeparateBlock(totalsStart);
         return lines;
+
+        void SeparateBlock(int start)
+        {
+            if (start > 0 && lines.Count > start) lines.Insert(start, "");
+        }
 
         void AddDetails(List<Detail> details, bool area)
         {

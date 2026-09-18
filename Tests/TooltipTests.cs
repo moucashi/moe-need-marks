@@ -18,8 +18,8 @@ public class TooltipTests
         var lines = TooltipFormatter.Lines(Example(), 0, 5, new());
         Assert.Equal(new[]
         {
-            "任务需要 (8/6)", "[未接取] 任务甲 (0/3)", "[已完成] 任务乙 (3/3)",
-            "藏身处需要 (5/7)", "[未建造] 设施甲 1级 (0/3)", "[未建造] 设施乙 2级 (0/4)",
+            "任务需要 (8/6)", "[未接取] 任务甲 (0/3)", "[已完成] 任务乙 (3/3)", "",
+            "藏身处需要 (5/7)", "[未建造] 设施甲 1级 (0/3)", "[未建造] 设施乙 2级 (0/4)", "",
             "当前已有 (0+5) 5", "总共需要 (8/13)"
         }, lines);
     }
@@ -28,7 +28,7 @@ public class TooltipTests
     public void AllDisplaySwitchCombinationsKeepRelativeOrderAndCounts()
     {
         var result = Example();
-        var all = TooltipFormatter.Lines(result, 0, 5, new());
+        var all = TooltipFormatter.Lines(result, 0, 5, new()).Where(l => l.Length > 0).ToList();
         for (int mask = 0; mask < 64; mask++)
         {
             var options = new DisplayOptions
@@ -42,7 +42,13 @@ public class TooltipTests
                 0 => options.QuestSummary, 1 or 2 => options.QuestDetails,
                 3 => options.AreaSummary, 4 or 5 => options.AreaDetails, 6 => options.Inventory, _ => options.Total
             });
-            Assert.Equal(expected, TooltipFormatter.Lines(result, 0, 5, options));
+            var actual = TooltipFormatter.Lines(result, 0, 5, options);
+            Assert.Equal(expected, actual.Where(l => l.Length > 0));
+            int blocks = (options.QuestSummary || options.QuestDetails ? 1 : 0)
+                + (options.AreaSummary || options.AreaDetails ? 1 : 0) + (options.Inventory || options.Total ? 1 : 0);
+            Assert.Equal(Math.Max(0, blocks - 1), actual.Count(l => l.Length == 0));
+            if (actual.Count > 0) { Assert.NotEmpty(actual[0]); Assert.NotEmpty(actual[^1]); }
+            Assert.DoesNotContain("\n\n\n", string.Join("\n", actual));
         }
     }
 
