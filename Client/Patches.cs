@@ -118,9 +118,14 @@ internal static class TooltipTextPatch
     [HarmonyPriority(Priority.First)]
     [HarmonyBefore("moe.trade.marker.client")]
     private static void Prefix(SimpleTooltip __instance, ref string __0) => HoverPanel.Capture(__instance, ref __0);
+}
+
+[HarmonyPatch(typeof(SimpleTooltip), nameof(SimpleTooltip.SetText))]
+internal static class TooltipComposePatch
+{
     [HarmonyPriority(Priority.Last)]
     [HarmonyAfter("moe.trade.marker.client")]
-    private static void Postfix(SimpleTooltip __instance) => HoverPanel.Append(__instance);
+    private static void Prefix(SimpleTooltip __instance, ref string __0) => HoverPanel.Compose(__instance, ref __0);
 }
 
 [HarmonyPatch(typeof(Tooltip), nameof(Tooltip.Close))]

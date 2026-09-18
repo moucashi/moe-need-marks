@@ -18,8 +18,8 @@ public class TooltipTests
         var lines = TooltipFormatter.Lines(Example(), 0, 5, new());
         Assert.Equal(new[]
         {
-            "任务需要 (8/6)", "  [未来] 任务甲：已提交 0/3", "  [已完成] 任务乙：已提交 3/3",
-            "藏身处需要 (5/7)", "  [待建造／升级] 设施甲 Lv.1：已提交 0/3", "  [未来] 设施乙 Lv.2：已提交 0/4",
+            "任务需要 (8/6)", "[未接取] 任务甲 (0/3)", "[已完成] 任务乙 (3/3)",
+            "藏身处需要 (5/7)", "[未建造] 设施甲 1级 (0/3)", "[未建造] 设施乙 2级 (0/4)",
             "当前已有 (0+5) 5", "总共需要 (8/13)"
         }, lines);
     }
@@ -47,9 +47,56 @@ public class TooltipTests
     }
 
     [Fact]
-    public void NoDemandStillShowsInventoryWithoutEmptyDemandBlocks()
+    public void NoDemandHidesInventoryAndAllNeedBlocks()
     {
-        Assert.Equal(new[] { "当前已有 (5+6) 11" }, TooltipFormatter.Lines(new(), 5, 6, new()));
+        Assert.Empty(TooltipFormatter.Lines(new(), 5, 6, new()));
+    }
+
+    [Fact]
+    public void CompactDetailsMatchRequestedStatusProgressAndFirFormat()
+    {
+        var result = new NeedResult
+        {
+            QuestRequired = 4, AreaRequired = 4,
+            Quests = new() { new() { NameKey = "未接任务", State = DisplayState.Available, Required = 2 }, new() { NameKey = "已接任务", State = DisplayState.Active, Submitted = 1, Required = 2, Fir = true } },
+            Areas = new() { new() { NameKey = "未建设施", Level = 3, State = DisplayState.Future, Required = 2, Fir = true }, new() { NameKey = "已建设施", Level = 1, State = DisplayState.Completed, Required = 2, Submitted = 2 } }
+        };
+        var lines = TooltipFormatter.Lines(result, 0, 0, new());
+        Assert.Contains("[未接取] 未接任务 (0/2)", lines);
+        Assert.Contains("[已接取] 已接任务 (1/2) FIR", lines);
+        Assert.Contains("[未建造] 未建设施 3级 (0/2) FIR", lines);
+        Assert.Contains("[已建造] 已建设施 1级 (2/2)", lines);
+        Assert.DoesNotContain(lines, l => l.Contains("已提交") || l.Contains("Lv."));
+        var hidden = TooltipFormatter.Lines(result, 0, 0, new() { Future = false, Available = false });
+        Assert.DoesNotContain(hidden, l => l.StartsWith("[未"));
+        Assert.Contains("任务需要 (0/4)", hidden); // visibility still does not alter totals
+    }
+
+    [Fact]
+    public void PeriodicAndConfigurationRefreshKeepVisibleTextUntilReplacementIsReady()
+    {
+        var cache = new RefreshCache<NeedCalculator>();
+        var snapshot = new Snapshot { Quests = new() { CalculationTests.Quest("q", CalculationTests.Goal(required: 2)) } };
+        cache.Publish(new NeedCalculator(snapshot, new(), 100));
+        var state = new TooltipTextState(); state.Reset("a");
+        string Render() => state.Compose("物品", string.Join("\n", TooltipFormatter.Lines(cache.Value!.Get("a"), 0, 1, new())));
+        string previous = Render();
+        for (int refresh = 0; refresh < 30; refresh++)
+        {
+            cache.Invalidate(); // response arrival / inventory event / F12 / repeatable expiry
+            Assert.True(cache.NeedsRefresh);
+            for (int deferredFrame = 0; deferredFrame < 10; deferredFrame++) Assert.Equal(previous, Render());
+            cache.Publish(new NeedCalculator(snapshot, new(), 100));
+            Assert.False(cache.NeedsRefresh);
+            Assert.Equal(previous, Render());
+        }
+        cache.Invalidate();
+        Assert.Throws<ArgumentNullException>(() => cache.Publish(null!));
+        Assert.Equal(previous, Render()); // failed replacement retains last valid state
+        cache.Publish(new NeedCalculator(new(), new(), 100));
+        Assert.Equal("物品", Render()); // a genuinely removed demand does disappear
+        cache.Clear();
+        Assert.Null(cache.Value); // a different session must not see the old character
     }
 
     [Fact]

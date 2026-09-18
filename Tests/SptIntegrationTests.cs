@@ -44,6 +44,25 @@ public class SptIntegrationTests(ITestOutputHelper output)
     }
 
     [Fact, Trait("Category", "SPT415")]
+    public void ActualEncryptedTapeNeedsTwoForIntelligenceThreeButDoesNotRequireFir()
+    {
+        const string template = "61bf7c024770ee6f9c6b8b53";
+        var snapshot = SnapshotBuilder.Build(ProjectionTests.Json("[]"), Read("SPT_Runtime/SPT_Data/database/hideout/areas.json"),
+            ProjectionTests.Json("{}"), _ => true, 100);
+        var need = CalculationTests.Calculate(snapshot, template);
+        var detail = Assert.Single(need.Areas);
+        Assert.Equal("needmarks:area:11", detail.NameKey);
+        Assert.Equal(3, detail.Level); Assert.Equal(2, detail.Required); Assert.Equal(0, detail.Submitted);
+        Assert.False(detail.Fir); Assert.False(need.AreaFirRemaining);
+        Assert.Equal(Marker.None, need.GetMarker(true, true, true));
+        Assert.Contains("藏身处需要 (2/2)", CalculationTests.Lines(need, 0, 2));
+        // If an effective recipe does require FIR, full stock must not suppress blue.
+        var goal = snapshot.Areas.Single(a => a.Type == 11 && a.Level == 3).Goals.Single(g => g.Targets.Contains(template));
+        goal.Fir = true;
+        Assert.Equal(Marker.Hideout, CalculationTests.Calculate(snapshot, template).GetMarker(true, true, true));
+    }
+
+    [Fact, Trait("Category", "SPT415")]
     public void ActualPunisherFiveSupportsSharedPistolProgress()
     {
         var definitions = Read("SPT_Runtime/SPT_Data/database/templates/quests.json");

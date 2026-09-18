@@ -21,22 +21,22 @@ internal static class RuntimeData
     private static int requestGeneration;
     private static string requestKey = "";
     private static Snapshot? snapshot;
-    private static NeedCalculator? calculator;
+    private static readonly RefreshCache<NeedCalculator> calculator = new();
     private static Profile? profile;
     private static float nextRequest, nextUiRefresh, demandedUntil, lastError;
     private static long nextExpiry;
-    private static bool dirty = true, stopped;
+    private static bool stopped;
     public static int Revision { get; private set; }
     public static Profile? Profile => profile;
     // A HideoutGameWorld also has a MainPlayer; only an actual raid uses a stash snapshot.
     public static bool InRaid => Singleton<AbstractGame>.Instance?.InRaid ?? false;
-    public static bool Ready => calculator != null;
+    public static bool Ready => calculator.Value != null;
 
     public static void Demand() => demandedUntil = Time.unscaledTime + 3f;
     public static void Invalidate(bool definitions = false)
     {
-        dirty = true;
-        if (definitions) { calculator = null; nextRequest = 0; }
+        calculator.Invalidate();
+        if (definitions) nextRequest = 0;
     }
 
     public static void Tick()
@@ -47,10 +47,10 @@ internal static class RuntimeData
         string key = current == null ? "" : RequestHandler.SessionId + ":" + (current.Side == EPlayerSide.Savage ? current.AccountId : current.Id);
         if (Gate.Switch(key))
         {
-            snapshot = null; calculator = null; nextRequest = 0; dirty = true; Revision++;
+            snapshot = null; calculator.Clear(); nextRequest = 0; Revision++;
             MarkerPatches.RestoreAll(); HoverPanel.Clear();
         }
-        if (!ReferenceEquals(profile, current)) { profile = current; dirty = true; }
+        if (!ReferenceEquals(profile, current)) { profile = current; calculator.Invalidate(); }
         float now = Time.unscaledTime;
         if (request != null && request.IsCompleted)
         {
@@ -60,7 +60,7 @@ internal static class RuntimeData
                 if (completed.Status == TaskStatus.RanToCompletion && completed.Result.Schema == 1 &&
                     (profile?.Side == EPlayerSide.Savage || completed.Result.ProfileId == profile?.Id))
                 {
-                    snapshot = completed.Result; calculator = null; dirty = true;
+                    snapshot = completed.Result; calculator.Invalidate();
                     nextExpiry = snapshot.Quests.Where(q => q.Repeatable).Select(q => q.CycleEnd).DefaultIfEmpty(long.MaxValue).Min();
                 }
                 else if (now - lastError > 15 || lastError == 0)
@@ -73,7 +73,7 @@ internal static class RuntimeData
             _ = completed.Exception;
         }
         long utc = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        if (nextExpiry > 0 && utc >= nextExpiry) { dirty = true; calculator = null; nextExpiry = long.MaxValue; nextRequest = 0; }
+        if (nextExpiry > 0 && utc >= nextExpiry) { calculator.Invalidate(); nextExpiry = long.MaxValue; nextRequest = 0; }
         if (profile != null && request == null && now >= nextRequest && (now <= demandedUntil || MarkerPatches.HasVisible))
         {
             nextRequest = now + 2f; requestGeneration = Gate.Generation; requestKey = Gate.Key;
@@ -81,9 +81,8 @@ internal static class RuntimeData
         }
         if (profile == null || now < nextUiRefresh) return;
         nextUiRefresh = now + 0.15f;
-        if (dirty || calculator == null && snapshot != null)
+        if (snapshot != null && calculator.NeedsRefresh)
         {
-            dirty = false;
             Rebuild(); Revision++;
             MarkerPatches.Refresh();
         }
@@ -110,10 +109,10 @@ internal static class RuntimeData
                 }
             }
         }
-        calculator = new NeedCalculator(snapshot, Settings.Need, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        calculator.Publish(new NeedCalculator(snapshot, Settings.Need, DateTimeOffset.UtcNow.ToUnixTimeSeconds()));
     }
 
-    public static NeedResult? Get(string template) { Demand(); return calculator?.Get(template); }
+    public static NeedResult? Get(string template) { Demand(); return calculator.Value?.Get(template); }
     public static (long Carried, long Stash) Count(string template)
     {
         if (profile?.Inventory == null) return (0, 0);
@@ -138,7 +137,7 @@ internal static class RuntimeData
 
     public static void Stop()
     {
-        stopped = true; Gate.Switch(""); snapshot = null; calculator = null; profile = null;
+        stopped = true; Gate.Switch(""); snapshot = null; calculator.Clear(); profile = null;
         if (request != null) _ = request.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
         request = null;
     }

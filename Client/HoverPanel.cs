@@ -47,7 +47,7 @@ internal static class HoverPanel
             ? state.Text.CaptureInput(text) : TooltipTextState.Strip(text);
     }
 
-    public static void Append(SimpleTooltip tooltip)
+    public static void Compose(SimpleTooltip tooltip, ref string text)
     {
         if (tooltip._label == null || !States.TryGetValue(tooltip, out var state) || state.Item == null) return;
         var need = RuntimeData.Get(state.Item.TemplateId);
@@ -58,8 +58,9 @@ internal static class HoverPanel
             addition = string.Join("\n", TooltipFormatter.Lines(need, counts.Carried, counts.Stash, Settings.Display, RuntimeData.Localize));
         }
         state.HasAddition = addition.Length != 0;
-        // Do not call SetText recursively: the label already contains other prefixes' output.
-        tooltip._label.text = state.Text.Compose(tooltip._label.text, addition);
+        // Compose after other prefixes but before the native setter. It receives one
+        // complete string and skips dirtying TMP geometry when the text is unchanged.
+        text = state.Text.Compose(text, addition);
         state.NextRefresh = Time.unscaledTime + 0.2f; state.Revision = RuntimeData.Revision;
     }
 
