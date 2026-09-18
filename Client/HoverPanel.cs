@@ -55,7 +55,7 @@ internal static class HoverPanel
         if (need != null)
         {
             var counts = RuntimeData.Count(state.Item.TemplateId);
-            addition = string.Join("\n", TooltipFormatter.Lines(need, counts.Carried, counts.Stash, Settings.Display, RuntimeData.Localize));
+            addition = string.Join("\n", TooltipFormatter.Lines(need, counts.Carried, counts.Stash, Settings.Display, RuntimeData.Localize, Settings.Language));
         }
         state.HasAddition = addition.Length != 0;
         // Compose after other prefixes but before the native setter. It receives one

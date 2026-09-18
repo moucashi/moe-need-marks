@@ -1,10 +1,10 @@
 # Moe Need Marks
 
-SPT **4.1.5** 的任务与藏身处物品需求标记模组，版本 **1.0.5**。客户端和服务端必须同时安装。
+SPT **4.1.5** 的任务与藏身处物品需求标记模组，版本 **1.1.0**。客户端和服务端必须同时安装。
 
 ## 安装
 
-将 `Moe-NeedMarks-1.0.5-SPT4.1.5.zip` 解压到游戏根目录，保留目录结构：
+将 `Moe-NeedMarks-1.1.0-SPT4.1.5.zip` 解压到游戏根目录，保留目录结构：
 
 ```text
 BepInEx/plugins/Moe-NeedMarks/MoeNeedMarks.Client.dll
@@ -18,6 +18,8 @@ SPT_Runtime/user/mods/Moe-NeedMarks/MoeNeedMarks.Server.deps.json
 不要与 MoreCheckmarks 同时启用：两者管理同一个原生勾，插件元数据已声明冲突。需求信息直接追加在原生物品悬浮提示内部，沿用原有字体、背景及定位，保留其他模组追加的价格和交易标记文本。
 
 ## 使用规则
+
+- **语言**：F12 → `00 Language / 语言` → `Language`，支持 `Auto`（默认）、`Chinese`、`English`。Auto 在中文游戏中使用中文，其他游戏语言暂用英文回退。覆盖汇总、状态、等级及附注，切换后即时刷新。任务／设施名称仍跟随游戏语言，F12 分类、名称及说明采用中英双语。升级保留既有配置。
 
 - 商店页面物品悬浮提示同样显示需求明细及汇总，沿用现有 F12 开关，保留原生价格和交易状态；商人货架数量不会计入“当前已有”。
 

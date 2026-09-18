@@ -132,7 +132,7 @@ internal static class RuntimeData
         if (key.StartsWith("needmarks:area:", StringComparison.Ordinal) && int.TryParse(key.Substring(15), out int area))
             return ((EAreaType)area).LocalizeAreaName();
         string value = key.Localized();
-        return string.IsNullOrEmpty(value) || value == key ? fallback : value;
+        return string.IsNullOrEmpty(value) || value == key ? UiText.Get(fallback, Settings.Language) : value;
     }
 
     public static void Stop()
