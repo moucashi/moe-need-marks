@@ -34,7 +34,8 @@ public sealed class Plugin : BaseUnityPlugin
             lastError = UnityEngine.Time.unscaledTime; Logger.LogError("需求标记刷新失败：" + e);
         }
     }
-    private void OnGUI() => HoverPanel.Draw();
+    private void LateUpdate() => HoverPanel.Layout();
+    private void OnGUI() => HoverPanel.HandleScroll();
     private void OnDestroy()
     {
         RuntimeData.Stop(); MarkerPatches.RestoreAll(); HoverPanel.Dispose(); harmony?.UnpatchSelf();

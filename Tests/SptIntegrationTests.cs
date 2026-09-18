@@ -79,6 +79,12 @@ public class SptIntegrationTests(ITestOutputHelper output)
         Method("EFT.UI.DragAndDrop.GridItemView", "ShowTooltip", 0);
         Method("EFT.UI.ItemTooltip", "Show", 7);
         Method("EFT.UI.SimpleTooltip", "Show", 4);
+        Method("EFT.UI.SimpleTooltip", "SetText", 1);
+        Method("EFT.UI.Tooltip", "Close", 0);
+        Method("EFT.UI.Tooltip", "SetPosition", 1);
+        Assert.Contains(types["EFT.UI.SimpleTooltip"].Fields, f => f.Name == "_label" && f.IsPublic && f.FieldType.FullName == "TMPro.TextMeshProUGUI");
+        foreach (string field in new[] { "_mainTransform", "_boundsTransform" })
+            Assert.Contains(types["EFT.UI.Tooltip"].Fields, f => f.Name == field && f.IsPublic);
         Method("EFT.Quests.TaskConditionCounter", "set_Value", 1);
         Method("EFT.Quests.Quest", "SetStatus", 3);
         Method("EFT.Hideout.AreaData", "set_Status", 1);

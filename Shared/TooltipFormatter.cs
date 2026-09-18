@@ -7,9 +7,6 @@ public static class TooltipFormatter
     {
         localize ??= (key, fallback) => string.IsNullOrEmpty(fallback) ? key : fallback;
         var lines = new List<string>(); long owned = carried + stash;
-        if (options.Inventory) lines.Add($"当前已有 ({carried}+{stash}) {owned}");
-        if (options.Total && result.QuestRequired + result.AreaRequired > 0)
-            lines.Add($"总共需要 ({result.QuestSubmitted + result.AreaSubmitted + owned}/{result.QuestRequired + result.AreaRequired})");
         if (result.QuestRequired > 0)
         {
             if (options.QuestSummary) lines.Add($"任务需要 ({result.QuestSubmitted + owned}/{result.QuestRequired})");
@@ -20,6 +17,9 @@ public static class TooltipFormatter
             if (options.AreaSummary) lines.Add($"藏身处需要 ({result.AreaSubmitted + owned}/{result.AreaRequired})");
             if (options.AreaDetails) AddDetails(result.Areas, true);
         }
+        if (options.Inventory) lines.Add($"当前已有 ({carried}+{stash}) {owned}");
+        if (options.Total && result.QuestRequired + result.AreaRequired > 0)
+            lines.Add($"总共需要 ({result.QuestSubmitted + result.AreaSubmitted + owned}/{result.QuestRequired + result.AreaRequired})");
         return lines;
 
         void AddDetails(List<Detail> details, bool area)

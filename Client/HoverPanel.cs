@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using EFT.InventoryLogic;
 using EFT.UI;
 using MoeNeedMarks.Shared;
@@ -5,101 +6,112 @@ using UnityEngine;
 
 namespace MoeNeedMarks.Client;
 
-/// <summary>
-/// Adjacent scrollable extension of the native tooltip. Original tooltip text and
-/// third-party additions are untouched; a single panel is reused for every item.
-/// Scroll while keeping the pointer on the item, so no click or pin is required.
-/// </summary>
+/// <summary>Tracks item context and appends requirements inside the native tooltip.</summary>
 internal static class HoverPanel
 {
+    private sealed class State
+    {
+        public Item? Item;
+        public readonly TooltipTextState Text = new();
+        public NativeTooltipScroll? Scroll;
+        public float NextRefresh;
+        public int Revision = -1;
+        public bool HasAddition;
+    }
     private static readonly Stack<Item?> Context = new();
-    private static SimpleTooltip? tooltip;
-    private static Item? item;
-    private static string text = "";
-    private static Vector2 scroll;
-    private static float nextRefresh;
-    private static int revision = -1;
-    private static GUIStyle? label, box;
-    private static Font? font;
-    private static Texture2D? background;
-    private static readonly Vector3[] Corners = new Vector3[4];
+    private static readonly ConditionalWeakTable<SimpleTooltip, State> States = new();
+    private static readonly List<WeakReference<SimpleTooltip>> Tracked = new();
 
     public static void Push(Item? value) => Context.Push(value);
     public static void Pop() { if (Context.Count > 0) Context.Pop(); }
-    public static void Track(SimpleTooltip value)
+
+    public static void Track(SimpleTooltip tooltip)
     {
+        Close(tooltip);
         var next = Context.Count > 0 ? Context.Peek() : null;
-        if (!ReferenceEquals(item, next)) scroll = Vector2.zero;
-        item = next; tooltip = next == null ? null : value;
-        text = ""; nextRefresh = 0; revision = -1;
-        if (next != null) RuntimeData.Demand();
+        if (next == null) return;
+        if (!States.TryGetValue(tooltip, out var state))
+        {
+            state = new State(); States.Add(tooltip, state);
+            Tracked.Add(new WeakReference<SimpleTooltip>(tooltip));
+        }
+        state.Item = next; state.Text.Reset(next.Id.ToString());
+        state.NextRefresh = 0; state.Revision = -1;
+        RuntimeData.Demand();
     }
-    private static bool Visible => item != null && tooltip != null && tooltip.Displayed && tooltip.gameObject.activeInHierarchy;
+
+    public static void Capture(SimpleTooltip tooltip, ref string text)
+    {
+        // Strip our block even if another mod replays an older tooltip's text.
+        text = States.TryGetValue(tooltip, out var state) && state.Item != null
+            ? state.Text.CaptureInput(text) : TooltipTextState.Strip(text);
+    }
+
+    public static void Append(SimpleTooltip tooltip)
+    {
+        if (tooltip._label == null || !States.TryGetValue(tooltip, out var state) || state.Item == null) return;
+        var need = RuntimeData.Get(state.Item.TemplateId);
+        string addition = "";
+        if (need != null)
+        {
+            var counts = RuntimeData.Count(state.Item.TemplateId);
+            addition = string.Join("\n", TooltipFormatter.Lines(need, counts.Carried, counts.Stash, Settings.Display, RuntimeData.Localize));
+        }
+        state.HasAddition = addition.Length != 0;
+        // Do not call SetText recursively: the label already contains other prefixes' output.
+        tooltip._label.text = state.Text.Compose(tooltip._label.text, addition);
+        state.NextRefresh = Time.unscaledTime + 0.2f; state.Revision = RuntimeData.Revision;
+    }
+
+    private static bool Visible(SimpleTooltip tooltip, State state) =>
+        tooltip != null && state.Item != null && tooltip.Displayed && tooltip.gameObject.activeInHierarchy && tooltip._label != null;
+
     public static void Tick()
     {
-        if (!Visible) return;
-        RuntimeData.Demand();
-        if (Time.unscaledTime < nextRefresh && revision == RuntimeData.Revision) return;
-        nextRefresh = Time.unscaledTime + 0.2f; revision = RuntimeData.Revision;
-        var need = RuntimeData.Get(item!.TemplateId);
-        if (need == null) { text = ""; return; }
-        var counts = RuntimeData.Count(item.TemplateId);
-        text = string.Join("\n", TooltipFormatter.Lines(need, counts.Carried, counts.Stash, Settings.Display, RuntimeData.Localize));
-    }
-    public static void Draw()
-    {
-        if (!Visible || text.Length == 0) return;
-        EnsureStyles();
-        float scale = Mathf.Clamp(Screen.height / 1080f, 0.8f, 1.6f);
-        label!.fontSize = Mathf.RoundToInt(16 * scale);
-        float width = Mathf.Min(620 * scale, Screen.width - 24);
-        float contentHeight = label.CalcHeight(new GUIContent(text), width - 40);
-        float height = Mathf.Min(contentHeight + 24, Screen.height * 0.58f);
-        bool overflowing = contentHeight > height - 24;
-        if (overflowing) height += 22 * scale;
-        float x = Input.mousePosition.x + 25, y = Screen.height - Input.mousePosition.y + 15;
-        if (tooltip!._boundsTransform != null)
+        Tracked.RemoveAll(w => !w.TryGetTarget(out var t) || t == null);
+        foreach (var weak in Tracked)
         {
-            tooltip._boundsTransform.GetWorldCorners(Corners);
-            float left = Corners[0].x, right = Corners[2].x;
-            x = right + 8 + width <= Screen.width ? right + 8 : left - width - 8;
-            y = Screen.height - Corners[2].y;
+            if (!weak.TryGetTarget(out var tooltip) || !States.TryGetValue(tooltip, out var state) || !Visible(tooltip, state)) continue;
+            RuntimeData.Demand();
+            if (Time.unscaledTime < state.NextRefresh && state.Revision == RuntimeData.Revision) continue;
+            tooltip.SetText(state.Text.RefreshInput(tooltip._label.text));
         }
-        x = Mathf.Clamp(x, 8, Mathf.Max(8, Screen.width - width - 8));
-        y = Mathf.Clamp(y, 8, Mathf.Max(8, Screen.height - height - 8));
-        var rect = new Rect(x, y, width, height);
-        int oldDepth = GUI.depth; var oldColor = GUI.color;
-        GUI.depth = -1000; GUI.color = Color.white;
-        GUI.Box(rect, GUIContent.none, box!);
-        var viewport = new Rect(x + 10, y + 10, width - 20, height - 20 - (overflowing ? 22 * scale : 0));
-        // The native tooltip closes if the cursor leaves the source item; wheel
-        // input is therefore accepted while still hovering that source item.
-        if (overflowing && Event.current.type == EventType.ScrollWheel)
+    }
+
+    public static void Layout()
+    {
+        foreach (var weak in Tracked)
         {
-            scroll.y = Mathf.Clamp(scroll.y + Event.current.delta.y * 28 * scale, 0, Mathf.Max(0, contentHeight - viewport.height));
-            Event.current.Use();
+            if (!weak.TryGetTarget(out var tooltip) || !States.TryGetValue(tooltip, out var state) || !Visible(tooltip, state)) continue;
+            if (!state.HasAddition) { state.Scroll?.Dispose(); state.Scroll = null; continue; }
+            state.Scroll ??= new NativeTooltipScroll(tooltip);
+            state.Scroll.Update();
         }
-        scroll = GUI.BeginScrollView(viewport, scroll, new Rect(0, 0, viewport.width - 20, contentHeight), false, overflowing);
-        GUI.Label(new Rect(0, 0, viewport.width - 20, contentHeight), text, label);
-        GUI.EndScrollView();
-        if (overflowing) GUI.Label(new Rect(x + 10, y + height - 25 * scale, width - 20, 24 * scale), "保持悬浮，滚轮查看全部需求", label);
-        GUI.color = oldColor; GUI.depth = oldDepth;
     }
-    private static void EnsureStyles()
+
+    // IMGUI is used only to consume wheel input while the cursor stays on the item.
+    // All rendering, clipping and layout belong to the existing Unity tooltip.
+    public static void HandleScroll()
     {
-        if (label != null) return;
-        font = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei", "SimHei", "Arial" }, 16);
-        label = new GUIStyle(GUI.skin.label) { font = font, fontSize = 16, wordWrap = true, richText = false, alignment = TextAnchor.UpperLeft, padding = new RectOffset(0, 0, 0, 0) };
-        label.normal.textColor = new Color(0.94f, 0.94f, 0.9f);
-        background = new Texture2D(1, 1); background.SetPixel(0, 0, new Color(0.065f, 0.07f, 0.065f, 0.97f)); background.Apply();
-        box = new GUIStyle(GUI.skin.box); box.normal.background = background;
+        if (Event.current.type != EventType.ScrollWheel) return;
+        foreach (var weak in Tracked)
+        {
+            if (weak.TryGetTarget(out var tooltip) && States.TryGetValue(tooltip, out var state) &&
+                Visible(tooltip, state) && state.Scroll?.Scroll(Event.current.delta.y) == true)
+            { Event.current.Use(); return; }
+        }
     }
-    public static void Clear() { tooltip = null; item = null; text = ""; scroll = Vector2.zero; }
-    public static void Dispose()
+
+    public static void Close(SimpleTooltip tooltip)
     {
-        Clear(); Context.Clear();
-        if (font != null) UnityEngine.Object.Destroy(font);
-        if (background != null) UnityEngine.Object.Destroy(background);
-        label = null; box = null;
+        if (!States.TryGetValue(tooltip, out var state)) return;
+        state.Scroll?.Dispose(); state.Scroll = null;
+        if (tooltip != null && tooltip._label != null) tooltip._label.text = TooltipTextState.Strip(tooltip._label.text);
+        state.Item = null; state.HasAddition = false; state.Text.Reset(null);
     }
+    public static void Clear()
+    {
+        foreach (var weak in Tracked) if (weak.TryGetTarget(out var tooltip) && tooltip != null) Close(tooltip);
+    }
+    public static void Dispose() { Clear(); Tracked.Clear(); Context.Clear(); }
 }

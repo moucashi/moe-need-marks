@@ -87,6 +87,7 @@ internal static class MarkerPatches
 [HarmonyPatch(typeof(GridItemView), nameof(GridItemView.ShowTooltip))]
 internal static class GridHoverPatch
 {
+    [HarmonyPriority(Priority.First)]
     private static void Prefix(GridItemView __instance) => HoverPanel.Push(__instance.Item);
     private static void Finalizer() => HoverPanel.Pop();
 }
@@ -109,6 +110,26 @@ internal static class MarkHoverPatch
 internal static class TooltipHoverPatch
 {
     private static void Prefix(SimpleTooltip __instance) => HoverPanel.Track(__instance);
+}
+
+[HarmonyPatch(typeof(SimpleTooltip), nameof(SimpleTooltip.SetText))]
+internal static class TooltipTextPatch
+{
+    [HarmonyPriority(Priority.First)]
+    [HarmonyBefore("moe.trade.marker.client")]
+    private static void Prefix(SimpleTooltip __instance, ref string __0) => HoverPanel.Capture(__instance, ref __0);
+    [HarmonyPriority(Priority.Last)]
+    [HarmonyAfter("moe.trade.marker.client")]
+    private static void Postfix(SimpleTooltip __instance) => HoverPanel.Append(__instance);
+}
+
+[HarmonyPatch(typeof(Tooltip), nameof(Tooltip.Close))]
+internal static class TooltipClosePatch
+{
+    private static void Prefix(Tooltip __instance)
+    {
+        if (__instance is SimpleTooltip tooltip) HoverPanel.Close(tooltip);
+    }
 }
 
 [HarmonyPatch]
