@@ -7,6 +7,21 @@ namespace MoeNeedMarks.Tests;
 
 public class ProjectionTests
 {
+    [Theory]
+    [InlineData("Completion")]
+    [InlineData("PickUp")]
+    public void RepeatableNamesUseGameTemplateOverrideInsteadOfDialogueKey(string type)
+    {
+        var raw = JsonSerializer.Serialize(new { RepeatableQuests = new[] { new { name = "Daily", endTime = 200,
+            activeQuests = new[] { new { _id = "daily", name = "61604635c725987e815b1a46 name 58330581ace78e27b8b10cee", type } } } } });
+        var quest = Build(raw, quests: "{}").Quests.Single();
+        Assert.Equal("DailyQuestName/" + type, quest.NameKey);
+        Assert.Equal("周期任务", quest.FallbackName);
+        var regular = Build("{}").Quests.Single();
+        Assert.Equal("q name", regular.NameKey);
+        Assert.Equal("test", regular.FallbackName);
+    }
+
     internal static JsonElement Json(string text) { using var d = JsonDocument.Parse(text); return d.RootElement.Clone(); }
     private const string QuestJson = """
       {"q":{"_id":"q","name":"q name","QuestName":"test","conditions":{"AvailableForStart":[],"AvailableForFinish":[

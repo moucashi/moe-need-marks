@@ -5,6 +5,28 @@ namespace MoeNeedMarks.Tests;
 
 public class TooltipTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CompletedColorTakesPrecedenceAndEachRowClosesItsColor(bool area, bool fir)
+    {
+        var detail = new Detail { NameKey = "名称", Required = 2, Fir = fir, State = DisplayState.Completed };
+        var result = new NeedResult { QuestRequired = area ? 0 : 2, AreaRequired = area ? 2 : 0 };
+        (area ? result.Areas : result.Quests).Add(detail);
+        var done = TooltipFormatter.Lines(result, 0, 0, new());
+        Assert.StartsWith("<color=#777777>", done[1]);
+        Assert.EndsWith("</color>", done[1]);
+        detail.State = DisplayState.Future;
+        var pending = TooltipFormatter.Lines(result, 0, 0, new());
+        if (fir) Assert.DoesNotContain("<color", pending[1]);
+        else { Assert.StartsWith("<color=#929DA6>", pending[1]); Assert.EndsWith("</color>", pending[1]); }
+        Assert.DoesNotContain("<color", pending.Last());
+    }
+
+    private static string Plain(string text) => System.Text.RegularExpressions.Regex.Replace(text, "</?color[^>]*>", "");
+
     private static NeedResult Example() => new()
     {
         QuestRequired = 6, QuestSubmitted = 3, AreaRequired = 7,
@@ -21,7 +43,7 @@ public class TooltipTests
             "任务需要 (8/6)", "[未接取] 任务甲 (0/3)", "[已完成] 任务乙 (3/3)", "",
             "藏身处需要 (5/7)", "[未建造] 设施甲 1级 (0/3)", "[未建造] 设施乙 2级 (0/4)", "",
             "当前已有 (0+5) 5", "总共需要 (8/13)"
-        }, lines);
+        }, lines.Select(Plain));
     }
 
     [Fact]
@@ -68,13 +90,13 @@ public class TooltipTests
             Areas = new() { new() { NameKey = "未建设施", Level = 3, State = DisplayState.Future, Required = 2, Fir = true }, new() { NameKey = "已建设施", Level = 1, State = DisplayState.Completed, Required = 2, Submitted = 2 } }
         };
         var lines = TooltipFormatter.Lines(result, 0, 0, new());
-        Assert.Contains("[未接取] 未接任务 (0/2)", lines);
+        Assert.Contains("[未接取] 未接任务 (0/2)", lines.Select(Plain));
         Assert.Contains("[已接取] 已接任务 (1/2) FIR", lines);
         Assert.Contains("[未建造] 未建设施 3级 (0/2) FIR", lines);
-        Assert.Contains("[已建造] 已建设施 1级 (2/2)", lines);
+        Assert.Contains("[已建造] 已建设施 1级 (2/2)", lines.Select(Plain));
         Assert.DoesNotContain(lines, l => l.Contains("已提交") || l.Contains("Lv."));
         var hidden = TooltipFormatter.Lines(result, 0, 0, new() { Future = false, Available = false });
-        Assert.DoesNotContain(hidden, l => l.StartsWith("[未"));
+        Assert.DoesNotContain(hidden, l => Plain(l).StartsWith("[未"));
         Assert.Contains("任务需要 (0/4)", hidden); // visibility still does not alter totals
     }
 

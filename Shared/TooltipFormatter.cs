@@ -43,7 +43,9 @@ public static class TooltipFormatter
                 if (detail.Branch) note += " 互斥";
                 if (detail.Kind != GoalKind.Handover) note += detail.Kind switch
                 { GoalKind.Gunsmith => " 整枪", GoalKind.Plant => " 埋放", _ => " 信标" };
-                lines.Add($"[{State(detail.State, area)}] {name} ({detail.Submitted}/{detail.Required}){note}");
+                string row = $"[{State(detail.State, area)}] {name} ({detail.Submitted}/{detail.Required}){note}";
+                string? color = detail.State == DisplayState.Completed ? "#777777" : !detail.Fir ? "#929DA6" : null;
+                lines.Add(color == null ? row : $"<color={color}>{row}</color>");
             }
         }
     }

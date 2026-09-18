@@ -49,6 +49,9 @@ public static class SnapshotBuilder
                 if (status is not (1 or 2 or 3 or 4)) continue;
                 var quest = ReadQuest(raw, state, counters, status);
                 quest.Repeatable = true; quest.CycleEnd = end;
+                // RepeatableQuestTemplate overrides NameLocaleKey; its raw name is a dialogue key.
+                quest.NameKey = "DailyQuestName/" + Text(raw, "type");
+                quest.FallbackName = "周期任务";
                 snapshot.Quests.Add(quest);
             }
         }

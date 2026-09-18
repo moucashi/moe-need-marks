@@ -14,6 +14,17 @@ public class SptIntegrationTests(ITestOutputHelper output)
     private static JsonElement Read(string relative) => ProjectionTests.Json(File.ReadAllText(Path.Combine(Spt, relative)));
 
     [Fact, Trait("Category", "SPT415")]
+    public void RepeatableCompletionNameResolvesInInstalledChineseLocale()
+    {
+        var template = Read("SPT_Runtime/SPT_Data/database/templates/repeatableQuests.json").GetProperty("templates").GetProperty("Completion");
+        var profile = ProjectionTests.Json("{\"RepeatableQuests\":[{\"name\":\"Daily\",\"endTime\":200,\"activeQuests\":[" + template.GetRawText() + "]}]}");
+        var snapshot = SnapshotBuilder.Build(ProjectionTests.Json("{}"), ProjectionTests.Json("[]"), profile, _ => true, 100);
+        var quest = Assert.Single(snapshot.Quests);
+        var locale = Read("SPT_Runtime/SPT_Data/database/locales/global/ch.json");
+        Assert.Equal("寻物上交", locale.GetProperty(quest.NameKey).GetString());
+    }
+
+    [Fact, Trait("Category", "SPT415")]
     public void RuntimeDatabaseAndExistingProfilesProduceFiniteConsistentResults()
     {
         var definitions = Read("SPT_Runtime/SPT_Data/database/templates/quests.json");
