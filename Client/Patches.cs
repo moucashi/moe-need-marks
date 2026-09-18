@@ -84,9 +84,17 @@ internal static class MarkerPatches
     }
 }
 
-[HarmonyPatch(typeof(GridItemView), nameof(GridItemView.ShowTooltip))]
+[HarmonyPatch]
 internal static class GridHoverPatch
 {
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.DeclaredMethod(typeof(GridItemView), nameof(GridItemView.ShowTooltip));
+        // TradingItemView does not call the base implementation. PriceTooltip
+        // inherits SimpleTooltip, so the existing composition and cleanup apply.
+        yield return AccessTools.DeclaredMethod(typeof(TradingItemView), nameof(TradingItemView.ShowTooltip));
+    }
+
     [HarmonyPriority(Priority.First)]
     private static void Prefix(GridItemView __instance) => HoverPanel.Push(__instance.Item);
     private static void Finalizer() => HoverPanel.Pop();

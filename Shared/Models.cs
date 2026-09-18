@@ -2,7 +2,7 @@ namespace MoeNeedMarks.Shared;
 
 public static class ModInfo
 {
-    public const string Version = "1.0.4";
+    public const string Version = "1.0.5";
     public const string Guid = "moe.needmarks";
     public const string Name = "Moe Need Marks";
     public const string Route = "/moe/needmarks/snapshot";

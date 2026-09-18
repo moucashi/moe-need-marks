@@ -107,6 +107,13 @@ public class SptIntegrationTests(ITestOutputHelper output)
         Method("EFT.UI.DragAndDrop.QuestItemViewPanel", "Show", 3);
         Method("EFT.UI.DragAndDrop.QuestItemViewPanel", "CG_Awake", 1);
         Method("EFT.UI.DragAndDrop.GridItemView", "ShowTooltip", 0);
+        Method("EFT.UI.DragAndDrop.TradingItemView", "ShowTooltip", 0);
+        Method("EFT.UI.PriceTooltip", "Show", 4);
+        Assert.Equal("EFT.UI.SimpleTooltip", types["EFT.UI.PriceTooltip"].BaseType.FullName);
+        var tradingHover = types["EFT.UI.DragAndDrop.TradingItemView"].Methods.Single(m => m.Name == "ShowTooltip");
+        Assert.Contains(tradingHover.Body.Instructions, i => i.Operand is MethodReference m && m.DeclaringType.FullName == "EFT.UI.PriceTooltip" && m.Name == "Show");
+        var priceShow = types["EFT.UI.PriceTooltip"].Methods.Single(m => m.Name == "Show");
+        Assert.Contains(priceShow.Body.Instructions, i => i.Operand is MethodReference m && m.DeclaringType.FullName == "EFT.UI.SimpleTooltip" && m.Name == "Show");
         Method("EFT.UI.ItemTooltip", "Show", 7);
         Method("EFT.UI.SimpleTooltip", "Show", 4);
         Method("EFT.UI.SimpleTooltip", "SetText", 1);
